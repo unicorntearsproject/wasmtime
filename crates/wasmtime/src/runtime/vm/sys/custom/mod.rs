@@ -51,3 +51,27 @@ pub fn component_async_tls_get() -> *mut u8 {
 pub fn component_async_tls_set(ptr: *mut u8) {
     unsafe { capi::wasmtime_tls_set(1, ptr) }
 }
+
+#[inline]
+#[cfg(feature = "threads")]
+pub fn now_ns() -> u64 {
+    unsafe { capi::wasmtime_now_ns() }
+}
+
+#[inline]
+#[cfg(feature = "threads")]
+pub fn thread_id() -> usize {
+    unsafe { capi::wasmtime_thread_id() }
+}
+
+#[inline]
+#[cfg(feature = "threads")]
+pub fn thread_park(deadline_ns: u64) {
+    unsafe { capi::wasmtime_thread_park(deadline_ns) }
+}
+
+#[inline]
+#[cfg(feature = "threads")]
+pub fn thread_unpark(thread_id: usize) {
+    unsafe { capi::wasmtime_thread_unpark(thread_id) }
+}

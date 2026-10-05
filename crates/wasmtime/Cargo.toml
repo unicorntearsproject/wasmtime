@@ -300,7 +300,12 @@ gc-null = ["gc", "wasmtime-environ/gc-null"]
 gc-copying = ["gc", "wasmtime-environ/gc-copying"]
 
 # Enable runtime support for the WebAssembly threads proposal.
-threads = ["std"]
+#
+# Without `std`, shared memories and `memory.atomic.wait`/`notify` use the
+# embedder hooks `wasmtime_now_ns`, `wasmtime_thread_id`, `wasmtime_thread_park`,
+# and `wasmtime_thread_unpark` (see `vm/sys/custom/capi.rs`), and the
+# `custom-sync-primitives` hooks should be provided so that locks can block.
+threads = ["wasmtime-environ/threads"]
 
 stack-switching = [
   "runtime",

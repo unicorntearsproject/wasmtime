@@ -23,10 +23,38 @@ pub struct MallocMemory {
 }
 
 impl MallocMemory {
+    /// Allocates the whole `maximum` size (or `minimum` when there is none)
+    /// up front, so growing the memory never moves its base pointer. Shared
+    /// memories need that, and without virtual memory this is the only way to
+    /// get it.
+    #[cfg(all(feature = "threads", not(has_virtual_memory)))]
+    pub fn new_fixed_capacity(
+        ty: &wasmtime_environ::Memory,
+        memory_tunables: &MemoryTunables<'_>,
+        minimum: usize,
+        maximum: Option<usize>,
+    ) -> Result<Self> {
+        let capacity = maximum.unwrap_or(minimum).max(minimum);
+        Self::with_capacity(ty, memory_tunables, minimum, capacity)
+    }
+
     pub fn new(
+        ty: &wasmtime_environ::Memory,
+        memory_tunables: &MemoryTunables<'_>,
+        minimum: usize,
+    ) -> Result<Self> {
+        let growth = memory_tunables.reservation_for_growth().try_into()?;
+        let capacity = minimum
+            .checked_add(growth)
+            .context("memory allocation size too large")?;
+        Self::with_capacity(ty, memory_tunables, minimum, capacity)
+    }
+
+    fn with_capacity(
         _ty: &wasmtime_environ::Memory,
         memory_tunables: &MemoryTunables<'_>,
         minimum: usize,
+        capacity: usize,
     ) -> Result<Self> {
         if memory_tunables.guard_size() > 0 {
             bail!("malloc memory is only compatible if guard pages aren't used");
@@ -38,9 +66,7 @@ impl MallocMemory {
             bail!("malloc memory cannot be used with CoW images");
         }
 
-        let initial_allocation_byte_size = minimum
-            .checked_add(memory_tunables.reservation_for_growth().try_into()?)
-            .context("memory allocation size too large")?;
+        let initial_allocation_byte_size = capacity;
 
         let initial_allocation_len = byte_size_to_element_len(initial_allocation_byte_size);
         let mut storage = Vec::new();

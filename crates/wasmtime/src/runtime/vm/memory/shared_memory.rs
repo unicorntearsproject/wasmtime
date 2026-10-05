@@ -1,13 +1,23 @@
 use crate::Engine;
 use crate::prelude::*;
-use crate::runtime::vm::memory::{LocalMemory, MmapMemory, validate_atomic_addr};
+#[cfg(not(has_virtual_memory))]
+use crate::runtime::vm::memory::MallocMemory;
+#[cfg(has_virtual_memory)]
+use crate::runtime::vm::memory::MmapMemory;
+use crate::runtime::vm::memory::{LocalMemory, validate_atomic_addr};
 use crate::runtime::vm::parking_spot::{ParkingSpot, Waiter};
+#[cfg(not(feature = "std"))]
+use crate::runtime::vm::threads_nostd::{Duration, Instant, RwLock};
 use crate::runtime::vm::{self, Memory, VMMemoryDefinition, WaitResult};
+use alloc::sync::Arc;
+use core::ops::Range;
+use core::ptr::NonNull;
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+#[cfg(feature = "std")]
 use std::cell::RefCell;
-use std::ops::Range;
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+#[cfg(feature = "std")]
+use std::sync::RwLock;
+#[cfg(feature = "std")]
 use std::time::{Duration, Instant};
 use wasmtime_environ::Trap;
 
@@ -40,9 +50,17 @@ impl SharedMemory {
         // Note that without a limiter being passed to `limit_new` this
         // `assert_ready` should never panic.
         let (minimum_bytes, maximum_bytes) = vm::assert_ready(Memory::limit_new(ty, None))?;
-        let mmap_memory = MmapMemory::new(ty, &memory_tunables, minimum_bytes, maximum_bytes)?;
-        let boxed: Box<dyn crate::runtime::vm::RuntimeLinearMemory> =
-            try_new::<Box<_>>(mmap_memory)?;
+        #[cfg(has_virtual_memory)]
+        let boxed: Box<dyn crate::runtime::vm::RuntimeLinearMemory> = try_new::<Box<_>>(
+            MmapMemory::new(ty, &memory_tunables, minimum_bytes, maximum_bytes)?,
+        )?;
+        // Without virtual memory a shared memory cannot reserve address space,
+        // so it takes its whole maximum size from the heap up front. That is
+        // what keeps the base pointer fixed while other threads use it.
+        #[cfg(not(has_virtual_memory))]
+        let boxed: Box<dyn crate::runtime::vm::RuntimeLinearMemory> = try_new::<Box<_>>(
+            MallocMemory::new_fixed_capacity(ty, &memory_tunables, minimum_bytes, maximum_bytes)?,
+        )?;
         Self::wrap(
             engine,
             ty,
@@ -143,8 +161,8 @@ impl SharedMemory {
         );
 
         // SAFETY: `addr_index` was validated by `validate_atomic_addr` above.
-        assert!(std::mem::size_of::<AtomicU32>() == 4);
-        assert!(std::mem::align_of::<AtomicU32>() <= 4);
+        assert!(core::mem::size_of::<AtomicU32>() == 4);
+        assert!(core::mem::align_of::<AtomicU32>() <= 4);
         let atomic = unsafe { AtomicU32::from_ptr(addr.cast()) };
         // Wasm linear memory is always little-endian, but `AtomicU32` uses the
         // host's native endianness.
@@ -156,10 +174,7 @@ impl SharedMemory {
         // can't represent the deadline we'll be here awhile.
         let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
 
-        WAITER.with(|waiter| {
-            let mut waiter = waiter.borrow_mut();
-            Ok(self.0.spot.wait32(atomic, expected, deadline, &mut waiter))
-        })
+        with_waiter(|waiter| Ok(self.0.spot.wait32(atomic, expected, deadline, waiter)))
     }
 
     /// Implementation of `memory.atomic.wait64` for this shared memory.
@@ -175,8 +190,8 @@ impl SharedMemory {
         );
 
         // SAFETY: `addr_index` was validated by `validate_atomic_addr` above.
-        assert!(std::mem::size_of::<AtomicU64>() == 8);
-        assert!(std::mem::align_of::<AtomicU64>() <= 8);
+        assert!(core::mem::size_of::<AtomicU64>() == 8);
+        assert!(core::mem::align_of::<AtomicU64>() <= 8);
         let atomic = unsafe { AtomicU64::from_ptr(addr.cast()) };
         // Wasm linear memory is always little-endian, but `AtomicU64` uses the
         // host's native endianness.
@@ -185,10 +200,7 @@ impl SharedMemory {
         // See `atomic_wait32` for why this is using `checked_add`.
         let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
 
-        WAITER.with(|waiter| {
-            let mut waiter = waiter.borrow_mut();
-            Ok(self.0.spot.wait64(atomic, expected, deadline, &mut waiter))
-        })
+        with_waiter(|waiter| Ok(self.0.spot.wait64(atomic, expected, deadline, waiter)))
     }
 
     pub(crate) fn byte_size(&self) -> usize {
@@ -204,10 +216,23 @@ impl SharedMemory {
     }
 }
 
+#[cfg(feature = "std")]
 thread_local! {
     /// Structure used in conjunction with `ParkingSpot` to block the current
     /// thread if necessary. Note that this is lazily initialized.
     static WAITER: RefCell<Waiter> = const { RefCell::new(Waiter::new()) };
+}
+
+/// Runs `f` with this thread's `Waiter`. Without `std` there is no thread
+/// local storage, so each wait uses a fresh `Waiter` (one small allocation).
+#[cfg(feature = "std")]
+fn with_waiter<R>(f: impl FnOnce(&mut Waiter) -> R) -> R {
+    WAITER.with(|waiter| f(&mut waiter.borrow_mut()))
+}
+
+#[cfg(not(feature = "std"))]
+fn with_waiter<R>(f: impl FnOnce(&mut Waiter) -> R) -> R {
+    f(&mut Waiter::new())
 }
 
 /// Shared memory needs some representation of a `VMMemoryDefinition` for

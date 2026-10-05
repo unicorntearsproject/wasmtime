@@ -83,7 +83,7 @@ compile = [
   "dep:wasmprinter",
 ]
 stack-switching = []
-threads = ['std']
+threads = []
 wmemcheck = ['std']
 std = [
   'anyhow/std',

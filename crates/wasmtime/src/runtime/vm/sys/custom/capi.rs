@@ -187,6 +187,31 @@ unsafe extern "C" {
     /// Setter for the TLS space described in `wasmtime_tls_get`.
     pub fn wasmtime_tls_set(slot: usize, ptr: *mut u8);
 
+    /// Returns the current monotonic time in nanoseconds. Only used by the
+    /// `threads` feature, to turn `memory.atomic.wait` timeouts into
+    /// deadlines. Any epoch is fine; it only has to be monotonic.
+    #[cfg(feature = "threads")]
+    pub fn wasmtime_now_ns() -> u64;
+
+    /// Returns an identifier of the calling thread that `wasmtime_thread_unpark`
+    /// accepts from any other thread. Used by the `threads` feature.
+    #[cfg(feature = "threads")]
+    pub fn wasmtime_thread_id() -> usize;
+
+    /// Blocks the calling thread until `wasmtime_thread_unpark` is called for
+    /// it or the monotonic `deadline_ns` passes (0 means no deadline).
+    ///
+    /// Semantics are those of `std::thread::park`: a wake-up that arrived
+    /// before this call makes it return immediately (one token per thread),
+    /// and spurious returns are allowed (Wasmtime re-checks its own state).
+    #[cfg(feature = "threads")]
+    pub fn wasmtime_thread_park(deadline_ns: u64);
+
+    /// Wakes the thread with this id, or leaves a token so its next park
+    /// returns immediately.
+    #[cfg(feature = "threads")]
+    pub fn wasmtime_thread_unpark(thread_id: usize);
+
     /// Frees a synchronization lock.
     ///
     /// May be called on a lock that was never used (still has a zero pattern).

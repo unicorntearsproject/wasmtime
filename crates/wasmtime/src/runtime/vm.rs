@@ -74,6 +74,8 @@ mod vmcontext;
 
 #[cfg(feature = "threads")]
 mod parking_spot;
+#[cfg(all(feature = "threads", not(feature = "std")))]
+mod threads_nostd;
 
 // Note that `debug_builtins` here is disabled with a feature or a lack of a
 // native compilation backend because it's only here to assist in debugging
