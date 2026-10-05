@@ -88,6 +88,7 @@ Cargo features are:
 * `debug-builtins`
 * `demangle`
 * `anyhow`
+* `threads`
 
 This notably does not include the `default` feature which means that when
 depending on Wasmtime you'll need to specify `default-features = false`. This
@@ -112,3 +113,13 @@ Note that many functions in this header file are gated behind off-by-default
 `#ifdef` directives indicating that Wasmtime doesn't require them by default.
 The `wasmtime` crate features `custom-{virtual-memory,native-signals}` can be
 used to enable usage of these APIs if desired.
+
+The `threads` feature, which provides shared memories and
+`memory.atomic.{wait,notify}`, also works without the standard library. It
+requires the `wasmtime_now_ns` and `wasmtime_thread_*` functions in the header
+file (behind `WASMTIME_CUSTOM_THREADS`) and, so that locks block instead of
+panicking when threads contend, the functions enabled by the
+`custom-sync-primitives` feature. Without virtual memory (see above) a shared
+memory allocates its whole maximum size up front, because its base address can't
+change while other threads are using it. Targets without 64-bit atomics don't
+support the `threads` feature.

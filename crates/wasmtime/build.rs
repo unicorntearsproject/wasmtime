@@ -44,12 +44,15 @@ fn main() {
     let has_custom_sync = !cfg!(feature = "std")
         && cfg!(feature = "custom-sync-primitives")
         && cfg!(feature = "runtime");
+    let has_custom_threads =
+        !cfg!(feature = "std") && cfg!(feature = "threads") && cfg!(feature = "runtime");
     let has_custom_fiber = !has_builtin_stackswitch && cfg!(feature = "custom-fiber");
 
     custom_cfg("has_native_signals", has_native_signals);
     custom_cfg("has_virtual_memory", has_virtual_memory);
     custom_cfg("has_custom_fiber", has_custom_fiber);
     custom_cfg("has_custom_sync", has_custom_sync);
+    custom_cfg("has_custom_threads", has_custom_threads);
     custom_cfg("has_host_compiler_backend", has_host_compiler_backend);
     custom_cfg("gc_zeal", cfg("fuzzing"));
 

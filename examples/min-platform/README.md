@@ -23,6 +23,9 @@ The example is organized into a few locations:
   to the `custom-virtual-memory` and `custom-native-signals` crate features of
   `wasmtime` which are off-by-default and are optional performance
   optimizations.
+  Setting `WASMTIME_CUSTOM_THREADS=1` for `build.sh` additionally builds the
+  `threads` feature, which has its own platform requirements
+  (`WASMTIME_CUSTOM_THREADS`) and runs a small test of shared memories.
 
 * `examples/min-platform/{Cargo.toml,src}` - an example "host embedding" which
   loads and runs the `embedding` from above. This is a bit contrived and mostly

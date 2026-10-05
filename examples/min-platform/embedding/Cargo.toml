@@ -31,6 +31,8 @@ doctest = false
 [features]
 default = ["wasi"]
 custom = ['wasmtime/custom-virtual-memory', 'wasmtime/custom-native-signals']
+# Shared memories and `memory.atomic.*`, which need thread-safe locks.
+threads = ['wasmtime/threads', 'wasmtime/custom-sync-primitives']
 wasi = [
     'wasmtime/component-model',
     'wasmtime/async',

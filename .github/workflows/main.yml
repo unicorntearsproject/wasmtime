@@ -638,6 +638,7 @@ jobs:
           os: ubuntu-latest
           test: >
             cargo check -p wasmtime --no-default-features --features runtime,component-model &&
+            cargo check -p wasmtime --no-default-features --features runtime,threads,custom-sync-primitives &&
             cargo check -p wasmtime --no-default-features --features runtime,gc,component-model-async,pulley,debug,debug-builtins,demangle,anyhow &&
             cargo check -p cranelift-control --no-default-features &&
             cargo check -p cranelift-assembler-x64 --lib &&
@@ -1200,6 +1201,18 @@ jobs:
       env:
         WASMTIME_SIGNALS_BASED_TRAPS: 1
         MIN_PLATFORM_TEST_DISABLE_WASI: 1
+
+    # Test shared memories in a `no_std` build, with and without virtual memory.
+    - run: ./build.sh x86_64-unknown-none
+      working-directory: ./examples/min-platform
+      env:
+        WASMTIME_CUSTOM_THREADS: 1
+
+    - run: ./build.sh x86_64-unknown-none
+      working-directory: ./examples/min-platform
+      env:
+        WASMTIME_SIGNALS_BASED_TRAPS: 1
+        WASMTIME_CUSTOM_THREADS: 1
 
     # Add the `wasmtime-platform.h` file as a release artifact
     - uses: actions/upload-artifact@v6

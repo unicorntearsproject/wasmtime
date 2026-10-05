@@ -16,4 +16,5 @@ wasmtime = { workspace = true, features = ['cranelift', 'wat'] }
 [features]
 default = ["wasi"]
 custom = []
+threads = ['wasmtime/threads']
 wasi = [ "wasmtime/component-model" ]

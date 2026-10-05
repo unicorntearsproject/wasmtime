@@ -31,6 +31,13 @@ if [ "$WASMTIME_CUSTOM_SYNC" = "1" ]; then
   features="$features,custom-sync-primitives"
 fi
 
+# Shared memories and `memory.atomic.wait`/`notify` without `std`. These need
+# thread-safe TLS and locks, so this implies `WASMTIME_CUSTOM_SYNC`.
+if [ "$WASMTIME_CUSTOM_THREADS" = "1" ]; then
+  cflags="$cflags -DWASMTIME_CUSTOM_THREADS -DWASMTIME_CUSTOM_SYNC"
+  features="$features,threads"
+fi
+
 if [ "$MIN_PLATFORM_EXAMPLE_DISABLE_WASI" != "1" ]; then
   features="$features,wasi"
   cargo build \

@@ -13,6 +13,9 @@ mod panic;
 #[cfg(feature = "wasi")]
 mod wasi;
 
+#[cfg(feature = "threads")]
+mod threads;
+
 /// Entrypoint of this embedding.
 ///
 /// This takes a number of parameters which are the precompiled module AOT

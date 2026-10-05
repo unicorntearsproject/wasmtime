@@ -1,4 +1,5 @@
-//! Implements thread wait and notify primitives with `std::sync` primitives.
+//! Implements thread wait and notify primitives with `std::sync` primitives
+//! (or, without `std`, with the embedder hooks wrapped by `threads_nostd`).
 //!
 //! This is a simplified version of the `parking_lot_core` crate.
 //!
@@ -11,13 +12,18 @@
 
 #![deny(missing_docs)]
 
+#[cfg(not(feature = "std"))]
+use super::threads_nostd::{Duration, Instant, Mutex, Thread, thread};
 use crate::prelude::*;
 use crate::runtime::vm::{SendSyncPtr, WaitResult};
-use std::collections::BTreeMap;
-use std::ptr::NonNull;
+use alloc::collections::BTreeMap;
+use core::ptr::NonNull;
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering::SeqCst};
+#[cfg(feature = "std")]
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::SeqCst};
+#[cfg(feature = "std")]
 use std::thread::{self, Thread};
+#[cfg(feature = "std")]
 use std::time::{Duration, Instant};
 
 #[derive(Default, Debug)]

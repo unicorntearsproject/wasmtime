@@ -256,3 +256,72 @@ void wasmtime_sync_rwlock_write_release(uintptr_t *lock) {
 }
 
 #endif // WASMTIME_CUSTOM_SYNC
+
+#ifdef WASMTIME_CUSTOM_THREADS
+
+#include <pthread.h>
+#include <stdlib.h>
+#include <time.h>
+
+// The thread hooks below are used by shared memories and
+// `memory.atomic.wait`/`memory.atomic.notify`. Each thread gets a lazily
+// created "parker" which is leaked when the thread exits: the thread id given
+// to Wasmtime is the address of this parker, which has to stay valid for as
+// long as another thread might unpark it.
+struct wasmtime_parker {
+  pthread_mutex_t lock;
+  pthread_cond_t cond;
+  int token;
+};
+
+static __thread struct wasmtime_parker *wasmtime_current_parker = NULL;
+
+uint64_t wasmtime_now_ns(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+
+uintptr_t wasmtime_thread_id(void) {
+  if (wasmtime_current_parker == NULL) {
+    struct wasmtime_parker *parker = calloc(1, sizeof(*parker));
+    if (parker == NULL)
+      abort();
+    pthread_mutex_init(&parker->lock, NULL);
+    pthread_condattr_t attr;
+    pthread_condattr_init(&attr);
+    pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+    pthread_cond_init(&parker->cond, &attr);
+    pthread_condattr_destroy(&attr);
+    wasmtime_current_parker = parker;
+  }
+  return (uintptr_t)wasmtime_current_parker;
+}
+
+void wasmtime_thread_park(uint64_t deadline_ns) {
+  struct wasmtime_parker *parker =
+      (struct wasmtime_parker *)wasmtime_thread_id();
+  pthread_mutex_lock(&parker->lock);
+  if (!parker->token) {
+    if (deadline_ns == 0) {
+      pthread_cond_wait(&parker->cond, &parker->lock);
+    } else {
+      struct timespec ts;
+      ts.tv_sec = deadline_ns / 1000000000ull;
+      ts.tv_nsec = deadline_ns % 1000000000ull;
+      pthread_cond_timedwait(&parker->cond, &parker->lock, &ts);
+    }
+  }
+  parker->token = 0;
+  pthread_mutex_unlock(&parker->lock);
+}
+
+void wasmtime_thread_unpark(uintptr_t thread_id) {
+  struct wasmtime_parker *parker = (struct wasmtime_parker *)thread_id;
+  pthread_mutex_lock(&parker->lock);
+  parker->token = 1;
+  pthread_cond_signal(&parker->cond);
+  pthread_mutex_unlock(&parker->lock);
+}
+
+#endif // WASMTIME_CUSTOM_THREADS

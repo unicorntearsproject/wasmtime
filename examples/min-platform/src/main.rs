@@ -187,6 +187,19 @@ fn main() -> Result<()> {
             bail!("{}", String::from_utf8_lossy(&error_buf));
         }
 
+        #[cfg(feature = "threads")]
+        {
+            let run_threads: Symbol<extern "C" fn(*mut u8, usize) -> usize> = lib
+                .get(b"run_threads")
+                .context("failed to find the `run_threads` symbol in the library")?;
+            let mut error_buf = Vec::with_capacity(1024);
+            let len = run_threads(error_buf.as_mut_ptr(), error_buf.capacity());
+            error_buf.set_len(len);
+            if len > 0 {
+                bail!("{}", String::from_utf8_lossy(&error_buf));
+            }
+        }
+
         #[cfg(feature = "wasi")]
         {
             let wasi_component_path = args

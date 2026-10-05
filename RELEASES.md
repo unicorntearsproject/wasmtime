@@ -7,6 +7,13 @@ Unreleased.
 - Add `--listenfd` option to `wasmtime serve`, which allows launching wasmtime
   with sockets inherited from a service manager (e.g. systemd socket units).
 
+- The `threads` Cargo feature of the `wasmtime` crate no longer requires the
+  `std` feature. Without `std`, shared memories and `memory.atomic.wait` and
+  `memory.atomic.notify` are implemented with four new embedder functions,
+  `wasmtime_now_ns`, `wasmtime_thread_id`, `wasmtime_thread_park` and
+  `wasmtime_thread_unpark`, in the same way as the existing custom platform
+  support. See `examples/min-platform` for an example.
+
 ### Changed
 
 - Remove non-functional `listenfd` WASI CLI option.

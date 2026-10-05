@@ -16,6 +16,7 @@
 //
 // * `WASMTIME_SIGNALS_BASED_TRAPS` - corresponds to `signals-based-traps`
 // * `WASMTIME_CUSTOM_SYNC` - corresponds to `custom-sync-primitives`
+// * `WASMTIME_CUSTOM_THREADS` - corresponds to `threads` when `std` is disabled
 // * `WASMTIME_CUSTOM_FIBER` - corresponds to `custom-fiber`
 //
 // Some more information about this header can additionally be found at
@@ -258,6 +259,43 @@ extern uint8_t *wasmtime_tls_get(uintptr_t slot);
  * Setter for the TLS space described in `wasmtime_tls_get`.
  */
 extern void wasmtime_tls_set(uintptr_t slot, uint8_t *ptr);
+
+#if defined(WASMTIME_CUSTOM_THREADS)
+/**
+ * Returns the current monotonic time in nanoseconds. Only used by the
+ * `threads` feature, to turn `memory.atomic.wait` timeouts into
+ * deadlines. Any epoch is fine; it only has to be monotonic.
+ */
+extern uint64_t wasmtime_now_ns(void);
+#endif
+
+#if defined(WASMTIME_CUSTOM_THREADS)
+/**
+ * Returns an identifier of the calling thread that `wasmtime_thread_unpark`
+ * accepts from any other thread. Used by the `threads` feature.
+ */
+extern uintptr_t wasmtime_thread_id(void);
+#endif
+
+#if defined(WASMTIME_CUSTOM_THREADS)
+/**
+ * Blocks the calling thread until `wasmtime_thread_unpark` is called for
+ * it or the monotonic `deadline_ns` passes (0 means no deadline).
+ *
+ * Semantics are those of `std::thread::park`: a wake-up that arrived
+ * before this call makes it return immediately (one token per thread),
+ * and spurious returns are allowed (Wasmtime re-checks its own state).
+ */
+extern void wasmtime_thread_park(uint64_t deadline_ns);
+#endif
+
+#if defined(WASMTIME_CUSTOM_THREADS)
+/**
+ * Wakes the thread with this id, or leaves a token so its next park
+ * returns immediately.
+ */
+extern void wasmtime_thread_unpark(uintptr_t thread_id);
+#endif
 
 #if defined(WASMTIME_CUSTOM_SYNC)
 /**

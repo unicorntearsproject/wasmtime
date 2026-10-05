@@ -253,8 +253,8 @@ answer unfortunately and style will still differ from person to person.
    `async` feature is disabled then stack switching is not necessary to
    implement. This is a lynchpin of Wasmtime's portability story where we don't
    guarantee all features compile on all platforms, but the "major" features
-   should compile on all platforms. An example of this is that `threads`
-   requires the standard library, but `runtime` does not.
+   should compile on all platforms. An example of this is that
+   `pooling-allocator` requires the standard library, but `runtime` does not.
 
 6. **Don't use `#[cfg]` for compiler features** - in contrast to the previous
    point it's generally not necessary to plumb `#[cfg]` features to Wasmtime's
