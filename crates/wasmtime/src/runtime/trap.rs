@@ -729,3 +729,28 @@ pub struct InterruptResume {
 pub unsafe fn interrupt_resume_point() -> Option<InterruptResume> {
     crate::runtime::vm::tls_interrupt_resume_point()
 }
+
+/// For an embedder that finds out about a fault itself (a page-fault handler of a kernel, with no
+/// signals): says whether the fault at `pc` (with the frame pointer `fp` and, for a memory access,
+/// the address touched) is a WebAssembly trap of the call this thread is making into WebAssembly.
+/// If it is, the trap is recorded as the reason of the unwind (with its backtrace) and the
+/// registers of the call's entry trap handler are returned, which the embedder loads before
+/// jumping there (what the signal-based path does after a trap). `None` means it is not a trap of
+/// this runtime (the pc is not in WebAssembly code, or is not a place where it may trap).
+///
+/// Like [`interrupt_resume_point`] it allocates: call it on the thread that faulted, in ordinary
+/// context, after the faulting instruction was abandoned, not inside the fault handler itself.
+///
+/// # Safety
+///
+/// The thread must really have faulted at `pc` in the body of a WebAssembly function of this
+/// runtime with `fp` its frame pointer, and must really be resumed at the returned point. The Rust
+/// frames between that point and the faulting instruction are abandoned (as they are for any
+/// trap), so they must hold nothing that needs to run to be sound.
+pub unsafe fn trap_resume_point(
+    pc: usize,
+    fp: usize,
+    faulting_addr: Option<usize>,
+) -> Option<InterruptResume> {
+    crate::runtime::vm::tls_trap_resume_point(pc, fp, faulting_addr)
+}

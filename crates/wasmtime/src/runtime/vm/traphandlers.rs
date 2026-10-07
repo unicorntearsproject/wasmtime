@@ -1473,3 +1473,22 @@ pub fn tls_interrupt_resume_point() -> Option<crate::InterruptResume> {
         })
     })
 }
+
+/// See [`crate::trap_resume_point`].
+pub fn tls_trap_resume_point(
+    pc: usize,
+    fp: usize,
+    faulting_addr: Option<usize>,
+) -> Option<crate::InterruptResume> {
+    tls::with(|info| {
+        let info = info?;
+        match info.test_if_trap(TrapRegisters { pc, fp }, faulting_addr, |_| false) {
+            TrapTest::Trap(handler) => Some(crate::InterruptResume {
+                pc: handler.pc,
+                sp: handler.sp,
+                fp: handler.fp,
+            }),
+            _ => None,
+        }
+    })
+}
