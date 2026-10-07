@@ -694,3 +694,38 @@ impl FrameSymbol {
         self.column
     }
 }
+
+/// Where an embedder resumes a thread it stopped from the outside: the registers to load before
+/// jumping to `pc` (with the payload registers zeroed, as for a trap).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InterruptResume {
+    /// The address to jump to: the trap handler of the thread's innermost WebAssembly entry.
+    pub pc: usize,
+    /// The stack pointer to load first.
+    pub sp: usize,
+    /// The frame pointer to load first.
+    pub fp: usize,
+}
+
+/// For an embedder that stops a thread asynchronously (from a timer interrupt, say) while it
+/// runs WebAssembly code: makes the call into WebAssembly that thread is running end with
+/// [`Trap::Interrupt`], and returns the registers to resume the thread with. The embedder loads
+/// `sp` and `fp`, zeroes the payload registers (`rax` and `rdx` on x86-64) and jumps to `pc`:
+/// the thread then leaves WebAssembly the way it does after any trap, and the call returns the
+/// error. `None` if the thread is in no call into WebAssembly.
+///
+/// It allocates the trap (a small box), so call it on the thread itself, in ordinary context, after
+/// redirecting the thread there from the interrupt: not from the interrupt handler. Whether the
+/// thread is in the middle of WebAssembly code is the caller's to establish: the interrupted
+/// instruction must be in the body of a WebAssembly function (see `Module::text` and
+/// `Module::functions` for the ranges), not in a trampoline or the runtime.
+///
+/// # Safety
+///
+/// The thread must have been executing the body of a WebAssembly function of this runtime when it
+/// was redirected, and must really be resumed at the returned point. The Rust frames between
+/// that point and the interrupted instruction are abandoned (as they are for any trap), so they
+/// must hold nothing that needs to run to be sound.
+pub unsafe fn interrupt_resume_point() -> Option<InterruptResume> {
+    crate::runtime::vm::tls_interrupt_resume_point()
+}

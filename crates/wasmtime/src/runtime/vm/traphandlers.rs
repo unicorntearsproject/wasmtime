@@ -1010,6 +1010,14 @@ impl CallThreadState {
         TrapTest::Trap(entry_handler)
     }
 
+    /// Records `Trap::Interrupt` as the reason of the next unwind of this activation and returns
+    /// where the unwind resumes (the activation's entry trap handler). The caller jumps there.
+    /// No backtrace is captured and no lock is taken (the trap is a small allocation).
+    pub(crate) fn interrupt_resume_handler(&self) -> Handler {
+        self.record_unwind(UnwindReason::from(crate::Trap::Interrupt));
+        self.entry_trap_handler()
+    }
+
     pub(crate) fn set_jit_trap(
         &self,
         TrapRegisters { pc, fp, .. }: TrapRegisters,
@@ -1450,4 +1458,18 @@ pub(crate) mod tls {
         let p = raw::get();
         unsafe { closure(if p.is_null() { None } else { Some(&*p) }) }
     }
+}
+
+/// See [`crate::interrupt_resume_point`].
+pub fn tls_interrupt_resume_point() -> Option<crate::InterruptResume> {
+    tls::with(|info| {
+        info.map(|info| {
+            let handler = info.interrupt_resume_handler();
+            crate::InterruptResume {
+                pc: handler.pc,
+                sp: handler.sp,
+                fp: handler.fp,
+            }
+        })
+    })
 }
