@@ -61,6 +61,11 @@ pub mod thread {
             .map_or(0, |i| i.0.max(1));
         sys::thread_park(deadline);
     }
+
+    /// Whether the embedder wants the current thread's wait abandoned.
+    pub fn interrupted() -> bool {
+        sys::thread_interrupted()
+    }
 }
 
 /// `std::sync::Mutex` without poisoning, on top of `crate::sync::RwLock`

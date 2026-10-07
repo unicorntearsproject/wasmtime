@@ -26,6 +26,13 @@ use std::thread::{self, Thread};
 #[cfg(feature = "std")]
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "std")]
+fn interrupted() -> bool {
+    false
+}
+#[cfg(not(feature = "std"))]
+use super::threads_nostd::thread::interrupted;
+
 #[derive(Default, Debug)]
 struct Spot {
     head: Option<SendSyncPtr<WaiterInner>>,
@@ -171,6 +178,14 @@ impl ParkingSpot {
                     }
                     None => Duration::MAX,
                 };
+
+                // Ask before every sleep, not only after a wake-up: a request that
+                // arrived before this thread started waiting must not be missed.
+                if interrupted() {
+                    // The embedder wants this wait abandoned: leave the queue.
+                    inner.get_mut(&key).unwrap().remove(ptr);
+                    return WaitResult::Interrupted;
+                }
 
                 drop(inner);
                 thread::park_timeout(timeout);

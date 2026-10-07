@@ -212,6 +212,15 @@ unsafe extern "C" {
     #[cfg(feature = "threads")]
     pub fn wasmtime_thread_unpark(thread_id: usize);
 
+    /// Returns whether the calling thread's `memory.atomic.wait` should be
+    /// abandoned. Wasmtime asks before every sleep of a wait (so a request
+    /// made earlier is never missed); if it returns true, the wait ends with
+    /// the `Trap::Interrupt` trap. An embedder that wants to stop a thread that
+    /// is blocked in a wait sets its own flag, calls `wasmtime_thread_unpark`
+    /// for the thread, and answers true here until the thread has stopped.
+    #[cfg(feature = "threads")]
+    pub fn wasmtime_thread_interrupted() -> bool;
+
     /// Frees a synchronization lock.
     ///
     /// May be called on a lock that was never used (still has a zero pattern).

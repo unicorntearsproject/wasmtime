@@ -458,6 +458,10 @@ pub enum WaitResult {
     /// Indicates that `wait` completed with a timeout, meaning that the
     /// original value matched as expected but nothing ever called `notify`.
     TimedOut = 2,
+    /// Indicates that the embedder asked for the wait to be abandoned (only
+    /// without `std`, through `wasmtime_thread_interrupted`). It surfaces to
+    /// WebAssembly as `Trap::Interrupt`, never as a value.
+    Interrupted = 3,
 }
 
 /// Description about a fault that occurred in WebAssembly.

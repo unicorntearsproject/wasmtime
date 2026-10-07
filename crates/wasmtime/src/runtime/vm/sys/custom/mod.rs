@@ -75,3 +75,9 @@ pub fn thread_park(deadline_ns: u64) {
 pub fn thread_unpark(thread_id: usize) {
     unsafe { capi::wasmtime_thread_unpark(thread_id) }
 }
+
+#[inline]
+#[cfg(feature = "threads")]
+pub fn thread_interrupted() -> bool {
+    unsafe { capi::wasmtime_thread_interrupted() }
+}

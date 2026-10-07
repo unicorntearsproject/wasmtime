@@ -174,7 +174,9 @@ impl SharedMemory {
         // can't represent the deadline we'll be here awhile.
         let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
 
-        with_waiter(|waiter| Ok(self.0.spot.wait32(atomic, expected, deadline, waiter)))
+        with_waiter(|waiter| {
+            interruptible(self.0.spot.wait32(atomic, expected, deadline, waiter))
+        })
     }
 
     /// Implementation of `memory.atomic.wait64` for this shared memory.
@@ -200,7 +202,9 @@ impl SharedMemory {
         // See `atomic_wait32` for why this is using `checked_add`.
         let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
 
-        with_waiter(|waiter| Ok(self.0.spot.wait64(atomic, expected, deadline, waiter)))
+        with_waiter(|waiter| {
+            interruptible(self.0.spot.wait64(atomic, expected, deadline, waiter))
+        })
     }
 
     pub(crate) fn byte_size(&self) -> usize {
@@ -246,3 +250,11 @@ fn with_waiter<R>(f: impl FnOnce(&mut Waiter) -> R) -> R {
 struct LongTermVMMemoryDefinition(VMMemoryDefinition);
 unsafe impl Send for LongTermVMMemoryDefinition {}
 unsafe impl Sync for LongTermVMMemoryDefinition {}
+
+/// An abandoned wait is a trap, not a result WebAssembly can see.
+fn interruptible(result: WaitResult) -> Result<WaitResult, Trap> {
+    match result {
+        WaitResult::Interrupted => Err(Trap::Interrupt),
+        other => Ok(other),
+    }
+}
